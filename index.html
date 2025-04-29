@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CarbonNudge - Email Carbon Checker</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <button id="darkModeToggle" onclick="toggleDarkMode()">🌙 Toggle Dark Mode</button>
+
+    <h1>📩 CarbonNudge</h1>
+    <p>Calculate digital carbon from your email and reduce it smartly 🌱</p>
+
+    <label>Email Body:</label><br>
+    <textarea id="emailBody" placeholder="Paste your email content here..." rows="6"></textarea><br><br>
+
+    <label>Recipients:</label><br>
+
+    <input type="radio" name="recMode" value="auto" checked onclick="toggleRecipientMode(true)"> Auto Detect from Emails<br>
+    <input type="radio" name="recMode" value="manual" onclick="toggleRecipientMode(false)"> Enter Count Only<br><br>
+    
+    <div id="autoRecipients">
+      <input type="text" id="recipients" placeholder="e.g., abc@x.com, def@x.com" />
+    </div>
+    
+    <div id="manualRecipients" style="display:none;">
+      <input type="number" id="recipientCount" placeholder="e.g., 3" />
+    </div>
+    
+    <br>
+    
+
+    <label>Attachment Size (MB):</label><br>
+    <input type="number" id="attachments" placeholder="e.g., 1.5" /><br><br>
+
+    <button onclick="calculateCarbon()">🌿 Calculate Carbon</button>
+
+    <div id="result"></div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
