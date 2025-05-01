@@ -86,7 +86,7 @@ function handleFootprintResult(recipientsCount, attachmentSize, footprint) {
 }
 
 // --------- Google Auth & Gmail Fetch ---------
-const CLIENT_ID = '652971808273-0mq90kmsfec50b4apt1ir4lj97c72irp.apps.googleusercontent.com'; // 👈 Replace this
+const CLIENT_ID = 'client ID'; // 👈 Replace this
 const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly';
 
 
