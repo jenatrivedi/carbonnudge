@@ -89,6 +89,7 @@ function handleFootprintResult(recipientsCount, attachmentSize, footprint) {
 const CLIENT_ID = '652971808273-0mq90kmsfec50b4apt1ir4lj97c72irp.apps.googleusercontent.com'; // 👈 Replace this
 const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly';
 
+
 let tokenClient;
 let gapiInited = false;
 let gisInited = false;
@@ -99,12 +100,14 @@ function gapiLoaded() {
 
 async function initializeGapiClient() {
     await gapi.client.init({
+        apiKey: "", // No API key needed for read-only
         clientId: CLIENT_ID,
-        scope: SCOPES
+        scope: SCOPES  // Ensure the correct scope here
     });
     gapiInited = true;
     maybeEnableButtons();
 }
+
 
 function gisLoaded() {
     tokenClient = google.accounts.oauth2.initTokenClient({
