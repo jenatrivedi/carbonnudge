@@ -5,7 +5,6 @@ function toggleRecipientMode(isAuto) {
 
 function calculateCarbon() {
     const emailText = document.getElementById('emailBody').value.trim();
-    const recipientsText = document.getElementById('recipients').value.trim();
     const attachmentSize = parseFloat(document.getElementById('attachments').value) || 0;
 
     const wordCount = emailText.split(/\s+/).filter(w => w.length > 0).length;
@@ -18,12 +17,10 @@ function calculateCarbon() {
     } else {
         recipientCount = parseInt(document.getElementById('recipientCount').value) || 0;
     }
-    
 
-    // Basic Estimations
-    const wordCarbon = wordCount * 0.00002;         // 0.02g per 1k words
-    const recipientCarbon = recipientCount * 0.5;   // 0.5g per recipient
-    const attachmentCarbon = attachmentSize * 2;    // 2g per MB approx.
+    const wordCarbon = wordCount * 0.00002;       
+    const recipientCarbon = recipientCount * 0.5;   
+    const attachmentCarbon = attachmentSize * 2;    
 
     const totalCarbon = wordCarbon + recipientCarbon + attachmentCarbon;
 
@@ -31,6 +28,8 @@ function calculateCarbon() {
         Estimated Carbon Footprint: <strong>${totalCarbon.toFixed(2)}g CO₂e</strong><br><br>
         <em>${generateTip(totalCarbon)}</em>
     `;
+
+    handleFootprintResult(recipientCount, attachmentSize, totalCarbon.toFixed(2));
 }
 
 function generateTip(carbon) {
@@ -42,24 +41,149 @@ function generateTip(carbon) {
 
 function toggleDarkMode() {
     document.body.classList.toggle('dark-mode');
-    document.querySelector('.container').classList.toggle('dark-mode');
+    document.querySelector('.container')?.classList.toggle('dark-mode');
 
     document.querySelectorAll('textarea, input, button, #result').forEach(el => {
         el.classList.toggle('dark-mode');
     });
 
-    // Save dark mode preference
-    if (document.body.classList.contains('dark-mode')) {
-        localStorage.setItem('carbonnudge-darkmode', 'on');
-    } else {
-        localStorage.setItem('carbonnudge-darkmode', 'off');
-    }
+    localStorage.setItem('carbonnudge-darkmode', document.body.classList.contains('dark-mode') ? 'on' : 'off');
 }
 
-// On Load — Check Dark Mode Preference
-window.onload = function() {
+window.onload = function () {
     if (localStorage.getItem('carbonnudge-darkmode') === 'on') {
         toggleDarkMode();
     }
+    loadPastFootprints();
 }
 
+function loadPastFootprints() {
+    const footprints = JSON.parse(localStorage.getItem('carbonnudge-footprints')) || [];
+    const list = document.getElementById('pastFootprints');
+    list.innerHTML = '';
+
+    footprints.forEach(footprint => {
+        const li = document.createElement('li');
+        li.textContent = `Recipients: ${footprint.recipients} | Attachment: ${footprint.attachmentSize}MB | Carbon Footprint: ${footprint.footprint}g`;
+        list.appendChild(li);
+    });
+}
+
+function saveFootprintToLocalStorage(footprint) {
+    let footprints = JSON.parse(localStorage.getItem('carbonnudge-footprints')) || [];
+    if (footprints.length >= 5) footprints.pop();
+    footprints.unshift(footprint);
+    localStorage.setItem('carbonnudge-footprints', JSON.stringify(footprints));
+}
+
+function handleFootprintResult(recipientsCount, attachmentSize, footprint) {
+    saveFootprintToLocalStorage({
+        recipients: recipientsCount,
+        attachmentSize: attachmentSize,
+        footprint: footprint
+    });
+    loadPastFootprints();
+}
+
+// --------- Google Auth & Gmail Fetch ---------
+const CLIENT_ID = '652971808273-0mq90kmsfec50b4apt1ir4lj97c72irp.apps.googleusercontent.com'; // 👈 Replace this
+const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly';
+
+let tokenClient;
+let gapiInited = false;
+let gisInited = false;
+
+function gapiLoaded() {
+    gapi.load('client', initializeGapiClient);
+}
+
+async function initializeGapiClient() {
+    await gapi.client.init({
+        clientId: CLIENT_ID,
+        scope: SCOPES
+    });
+    gapiInited = true;
+    maybeEnableButtons();
+}
+
+function gisLoaded() {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: SCOPES,
+        callback: (tokenResponse) => {
+            gapi.client.setToken(tokenResponse);
+            onLoginSuccess();
+        },
+    });
+    gisInited = true;
+    maybeEnableButtons();
+}
+
+function maybeEnableButtons() {
+    if (gapiInited && gisInited) {
+        document.getElementById('loginSection').style.display = 'block';
+    }
+}
+
+function handleAuthClick() {
+    tokenClient.requestAccessToken();
+}
+
+function handleSignoutClick() {
+    gapi.client.setToken('');
+    document.getElementById('gmailFetchSection').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'none';
+    document.querySelector('[onclick="handleAuthClick()"]').style.display = 'inline-block';
+    document.querySelector('[onclick="handleSignoutClick()"]').style.display = 'none';
+}
+
+// 🎯 Called when user logs in successfully
+function onLoginSuccess() {
+    document.getElementById('gmailFetchSection').style.display = 'block';
+    document.getElementById('mainApp').style.display = 'block';
+    document.querySelector('[onclick="handleAuthClick()"]').style.display = 'none';
+    document.querySelector('[onclick="handleSignoutClick()"]').style.display = 'inline-block';
+    loadPastFootprints();
+}
+
+async function fetchLatestGmail() {
+    try {
+        const res = await gapi.client.gmail.users.messages.list({
+            userId: 'me',
+            maxResults: 1,
+            labelIds: ['DRAFT'],
+        });
+
+        const messageId = res.result.messages?.[0]?.id;
+        if (!messageId) return alert('No draft emails found.');
+
+        const msg = await gapi.client.gmail.users.messages.get({
+            userId: 'me',
+            id: messageId,
+            format: 'full'
+        });
+
+        const headers = msg.result.payload.headers;
+        const toHeader = headers.find(h => h.name === 'To')?.value || '';
+        const body = getEmailBody(msg.result.payload);
+
+        document.getElementById('recipients').value = toHeader;
+        document.getElementById('emailBody').value = body;
+
+        calculateCarbon();
+    } catch (e) {
+        console.error('Gmail fetch failed:', e);
+        alert('Failed to fetch Gmail draft. Check permissions.');
+    }
+}
+
+function getEmailBody(payload) {
+    if (!payload.parts) return atob(payload.body.data || '');
+
+    for (const part of payload.parts) {
+        if (part.mimeType === 'text/plain') {
+            return atob(part.body.data || '');
+        }
+    }
+    return '';
+}
